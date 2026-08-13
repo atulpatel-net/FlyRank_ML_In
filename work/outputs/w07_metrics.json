@@ -1,0 +1,16 @@
+{
+  "validation": {
+    "split": "client_grouped",
+    "accuracy": 0.616,
+    "precision": 0.67,
+    "recall": 0.812,
+    "f1": 0.735,
+    "client_overlap": 0
+  },
+  "queue": {
+    "rows": 42558,
+    "high_model_risk_count": 17951,
+    "moderate_model_risk_count": 11951
+  },
+  "note": "Model scores are used for ranking and prioritization, not as calibrated probabilities."
+}
