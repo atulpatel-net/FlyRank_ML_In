@@ -1,7 +1,7 @@
 # Content Decline Prioritization from Historical Search Performance
 
 **Author:** Atul Patel  
-**Lane:** Machine Learning  
+**Lane:** Refresh / Content Opportunity Scoring 
 **Repo:** FlyRank_ML_In  
 **Date:** August 2026
 
