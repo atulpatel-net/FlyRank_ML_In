@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Decline Prioritization from Historical Search Performance</title>
+
+<style>
+body {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    font-family: Arial, Helvetica, sans-serif;
+    line-height: 1.7;
+    color: #202124;
+    background: #ffffff;
+}
+
+h1 {
+    font-size: 2.4rem;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+}
+
+h2 {
+    margin-top: 2.8rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #ddd;
+}
+
+h3 {
+    margin-top: 2rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px 12px;
+    text-align: left;
+}
+
+th {
+    background: #f5f5f5;
+}
+
+code {
+    background: #f3f3f3;
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+
+a {
+    color: #2457a6;
+}
+
+img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 20px auto 40px;
+}
+
+hr {
+    margin: 4rem 0 2rem;
+    border: 0;
+    border-top: 1px solid #ddd;
+}
+
+blockquote {
+    border-left: 4px solid #ddd;
+    padding-left: 16px;
+    color: #555;
+}
+</style>
+</head>
+
+<body>
+<h1>Content Decline Prioritization from Historical Search Performance</h1>
+<p><strong>Author:</strong> Atul Patel<br />
+<strong>Lane:</strong> Machine Learning<br />
+<strong>Repo:</strong> FlyRank_ML_In<br />
+<strong>Date:</strong> August 2026</p>
+<h2>Abstract</h2>
+<p>This study asks whether historical search-performance signals can help prioritize content that may warrant human review for declining organic search visibility. Using anonymized FlyRank ML Internship search-performance data, the analysis constructs previous-30-day impressions, clicks, and average-position features and defines an observed decline when subsequent 30-day impressions fall below 80% of the previous baseline. A Random Forest classifier was evaluated against a transparent Week-4 rule-based baseline using a client-grouped 75/25 validation split that prevents client overlap between training and test data. On this held-out split, the Random Forest measured an F1 score of 0.735 compared with 0.018 for the rule-based baseline, with measured precision of 0.670 and recall of 0.813. The resulting model output is treated as directional decision-support for prioritizing human content review, not as a causal prediction of future search performance or an automated recommendation to change content.</p>
+<h2>1. Problem framing</h2>
+<h3>Research question</h3>
+<p>Can historical search-performance signals be used to prioritize content that may warrant human review for declining organic search visibility?</p>
+<h3>Decision supported</h3>
+<p>The unit of analysis is a <strong>client-content pair</strong>. The analysis produces a decline classification and ranking signal that can be used to prioritize which content should be reviewed first.</p>
+<p>A FlyRank editor or SEO practitioner can use the ranked output to investigate high-priority content, review search intent and relevance, and decide whether to refresh, monitor, investigate further, or take no action.</p>
+<h3>Why data and ML help</h3>
+<p>Large content portfolios can contain many pages whose search performance changes over time. A transparent rule can identify some cases, but it may not prioritize observations consistently across different historical performance patterns.</p>
+<p>The model provides a measured way to combine a small set of historical search-performance signals into a review-prioritization score. The purpose is therefore not to automate editorial decisions, but to reduce the amount of manual screening required before human review.</p>
+<h3>Cost of a wrong call</h3>
+<p>A false positive can cause an editor to spend time investigating content that does not require intervention. A false negative can cause potentially useful content to receive less attention than it otherwise would.</p>
+<p>For this reason, the output is treated as <strong>decision-support</strong>, with human review required before any content action is taken.</p>
+<h2>2. Data safety</h2>
+<p>The analysis uses the FlyRank ML Internship dataset from the <code>FlyRank/internship-warehouse</code> release, specifically the <code>fact_content_daily_performance</code> data.</p>
+<p>The available source data spans <strong>27 January 2025 through 30 June 2026</strong> and contains approximately <strong>78.8 million daily records</strong> across the available monthly files.</p>
+<h3>Data used</h3>
+<p>The analysis uses:</p>
+<ul>
+<li><code>report_date</code></li>
+<li><code>client_hash_id</code></li>
+<li><code>content_hash_id</code></li>
+<li><code>gsc_impressions</code></li>
+<li><code>gsc_clicks</code></li>
+<li><code>gsc_avg_position</code></li>
+</ul>
+<p>The final model features are previous-30-day impressions, clicks, and average position.</p>
+<h3>Deliberate exclusions</h3>
+<p><code>client_hash_id</code> and <code>content_hash_id</code> are <strong>pseudonymous identifiers</strong>. They are used for grouping, joins, and validation only; they are not model features.</p>
+<p>Label-derived fields such as <code>trend_direction</code>, <code>trend_pct</code>, or equivalent target-period outcomes are not used as model features because they could leak information about the outcome being predicted.</p>
+<p>The model also does not use client names, URLs, private search queries, or other client-identifying information.</p>
+<h3>Leakage controls</h3>
+<p>The decline label is based on the subsequent 30-day impression window, while model features are constructed from the preceding 30-day window.</p>
+<p>The primary validation uses a client-grouped split, ensuring that no client appears in both the training and test sets. The resulting client overlap was <strong>0</strong>.</p>
+<p>Rows without positive previous-30-day impressions were excluded because a decline relative to a positive historical baseline cannot be meaningfully defined for those observations.</p>
+<h3>Public safety</h3>
+<p>The underlying bulk dataset is not committed to the repository. Public outputs contain anonymized identifiers and aggregate/model results only. No client-identifying URLs, names, or private search queries are included in the research artifact.</p>
+<h2>3. Baseline</h2>
+<p>The initial benchmark was a transparent rule-based classifier developed before the Random Forest model.</p>
+<p>The rule flags an observation when all three conditions are met:</p>
+<ul>
+<li>Previous-30-day impressions are at least 100.</li>
+<li>Previous-30-day clicks are zero.</li>
+<li>Previous-30-day average position is 10 or better.</li>
+</ul>
+<p>An observation satisfying all three conditions is classified as declining.</p>
+<p>This baseline provides a simple, interpretable comparison because it uses the same historical performance signals as the model and requires no learned parameters.</p>
+<h3>Baseline performance</h3>
+<p>The rule was evaluated on the same client-grouped test split used for the Random Forest:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th style="text-align: right;">Accuracy</th>
+<th style="text-align: right;">Precision</th>
+<th style="text-align: right;">Recall</th>
+<th style="text-align: right;">F1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Week-4 Rule Baseline</td>
+<td style="text-align: right;">0.346</td>
+<td style="text-align: right;">0.517</td>
+<td style="text-align: right;">0.009</td>
+<td style="text-align: right;">0.018</td>
+</tr>
+<tr>
+<td>Random Forest</td>
+<td style="text-align: right;">0.616</td>
+<td style="text-align: right;">0.670</td>
+<td style="text-align: right;">0.813</td>
+<td style="text-align: right;">0.735</td>
+</tr>
+</tbody>
+</table>
+<p>The baseline therefore provides a transparent reference point for evaluating whether the learned model adds useful measured classification signal beyond the initial rule.</p>
+<h2>4. Model / analysis</h2>
+<p>A Random Forest classifier was used to model the relationship between historical search-performance signals and the observed decline label.</p>
+<h3>Features</h3>
+<p>The model uses three features, all calculated from the previous 30-day window:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>imp_prev30</code></td>
+<td>Total Google Search Console impressions</td>
+</tr>
+<tr>
+<td><code>clk_prev30</code></td>
+<td>Total Google Search Console clicks</td>
+</tr>
+<tr>
+<td><code>pos_prev30</code></td>
+<td>Average Google Search Console position</td>
+</tr>
+</tbody>
+</table>
+<p>Client and content identifiers were deliberately excluded from the feature set. They are used only for grouping, traceability, and validation.</p>
+<h3>Target definition</h3>
+<p>The target is defined as:</p>
+<p><code>is_declining = 1</code> when <code>imp_last30 &lt; 0.8 × imp_prev30</code>; otherwise <code>0</code>.</p>
+<p>This represents an <strong>observed 20% or greater reduction in impressions</strong> between the previous and most recent 30-day windows.</p>
+<h3>Model configuration</h3>
+<p>The Random Forest uses:</p>
+<ul>
+<li>200 decision trees</li>
+<li><code>random_state = 42</code></li>
+<li>Parallel training using all available CPU cores</li>
+</ul>
+<p>The model was selected as a practical nonlinear classifier that can capture interactions between the historical performance features without requiring a manually specified decision boundary.</p>
+<h3>Analytical assumptions</h3>
+<p>The analysis assumes that historical impressions, clicks, and average position contain useful directional information for prioritizing content for review.</p>
+<p>It does not assume that these features explain the cause of a decline, that the model represents a calibrated probability, or that a predicted decline implies a specific content intervention will be successful.</p>
+<h2>5. Evaluation</h2>
+<h3>Validation design</h3>
+<p>The primary evaluation uses a <strong>client-grouped 75/25 train-test split</strong> with <code>random_state = 42</code>.</p>
+<p>The split produced:</p>
+<ul>
+<li>Training observations: <strong>194,871</strong></li>
+<li>Test observations: <strong>42,558</strong></li>
+<li>Unique clients: <strong>56</strong></li>
+<li>Client overlap between train and test: <strong>0</strong></li>
+</ul>
+<p>This design is preferred over a simple row-level random split because observations from the same client can otherwise appear in both training and test data.</p>
+<h3>Class distribution</h3>
+<p>The full modeling dataset contains:</p>
+<ul>
+<li>Declining: <strong>169,864 observations (71.5%)</strong></li>
+<li>Non-declining: <strong>67,565 observations (28.5%)</strong></li>
+</ul>
+<p>The majority-class rate is therefore approximately <strong>71.5%</strong>. Accuracy should be interpreted alongside precision, recall, and F1 rather than on its own.</p>
+<h3>Model vs baseline</h3>
+<p>Both approaches were evaluated on the same client-grouped test observations:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th style="text-align: right;">Accuracy</th>
+<th style="text-align: right;">Precision</th>
+<th style="text-align: right;">Recall</th>
+<th style="text-align: right;">F1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Week-4 Rule Baseline</td>
+<td style="text-align: right;">0.346</td>
+<td style="text-align: right;">0.517</td>
+<td style="text-align: right;">0.009</td>
+<td style="text-align: right;">0.018</td>
+</tr>
+<tr>
+<td>Random Forest</td>
+<td style="text-align: right;">0.616</td>
+<td style="text-align: right;">0.670</td>
+<td style="text-align: right;">0.813</td>
+<td style="text-align: right;">0.735</td>
+</tr>
+</tbody>
+</table>
+<p>The Random Forest measured substantially higher precision, recall, and F1 than the transparent rule-based baseline on this split.</p>
+<p>Its accuracy of 0.616 is below the 71.5% majority-class rate, which is an important reason not to present accuracy alone as evidence of model quality. The F1 result provides a more useful view of the model's classification performance on the defined task.</p>
+<h3>Error analysis</h3>
+<p>On the 42,558-observation client-grouped test set, the Random Forest produced:</p>
+<table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th style="text-align: right;">Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Correct classifications</td>
+<td style="text-align: right;">26,216</td>
+</tr>
+<tr>
+<td>False positives</td>
+<td style="text-align: right;">11,133</td>
+</tr>
+<tr>
+<td>False negatives</td>
+<td style="text-align: right;">5,209</td>
+</tr>
+</tbody>
+</table>
+<p>The larger number of false positives indicates that the model sometimes flags observations as declining when they do not match the defined decline label. In this decision-support setting, such errors primarily represent additional human-review effort.</p>
+<p>False negatives are fewer but represent observations matching the decline label that the model did not identify. These cases illustrate why the ranked output should not be treated as a complete or guaranteed detection system.</p>
+<p>The error analysis therefore supports using the model as a <strong>prioritization aid</strong>, with human review remaining necessary before any content action.</p>
+<h3>Validation interpretation</h3>
+<p>The client-grouped evaluation provides a more conservative assessment than the earlier row-level random split. The row-level split measured an F1 score of <strong>0.781</strong>, while the client-grouped split measured <strong>0.735</strong>.</p>
+<p>This reduction is consistent with the stricter validation design and illustrates why the grouped result is used as the primary result in this paper.</p>
+<p>The evaluation supports the conclusion that the Random Forest provides <strong>measured classification signal for the defined decline label under this validation setup</strong>. It does not establish future-period performance, causality, or guaranteed improvement from subsequent content actions.</p>
+<h2>6. Interpretation</h2>
+<p>The analysis suggests that recent historical search-performance signals contain useful directional information for distinguishing observations that match the defined decline label.</p>
+<p>The Random Forest uses previous-30-day impressions, clicks, and average position jointly rather than relying on a single threshold. This allows the model to identify combinations of historical performance signals that the simple Week-4 rule does not capture.</p>
+<h3>What the model output means</h3>
+<p>The model's output is most useful as a prioritization signal. A higher decline score indicates that an observation is more strongly associated with the learned patterns corresponding to the defined decline label in the evaluation data.</p>
+<p>The score should not be interpreted as a calibrated probability or as evidence that a particular page will definitely decline.</p>
+<h3>Interpretation for content review</h3>
+<p>The Week-7 action playbook translates the model output into human-readable reason codes and content archetypes. Examples include:</p>
+<ul>
+<li>High model risk with low prior impressions.</li>
+<li>High model risk with no prior clicks.</li>
+<li>High model risk with weaker prior position.</li>
+<li>High model risk among more established or higher-visibility content.</li>
+</ul>
+<p>These signals can help determine what should be investigated first, but they do not explain why a page's performance changed.</p>
+<h3>Important negative finding</h3>
+<p>The analysis does not establish that any individual historical feature causes search-performance decline. It also does not establish that refreshing a page will reverse an observed decline.</p>
+<p>The most defensible interpretation is therefore that the model provides a <strong>measured, directional signal for prioritizing human review</strong> under the tested validation design.</p>
+<h1>Random Forest feature importance</h1>
+<p>feature_importance = pd.DataFrame({
+    "Feature": feature_cols,
+    "Importance": rf.feature_importances_
+}).sort_values("Importance", ascending=False)</p>
+<p>display(feature_importance.round(3))</p>
+<p>plt.figure(figsize=(7, 5))</p>
+<p>plt.bar(
+    feature_importance["Feature"],
+    feature_importance["Importance"]
+)</p>
+<p>plt.ylabel("Feature importance")
+plt.xlabel("Feature")
+plt.title("Random Forest Feature Importance")</p>
+<p>plt.tight_layout()</p>
+<p>feature_importance_path = figures_dir / "capstone_feature_importance.png"</p>
+<p>plt.savefig(
+    feature_importance_path,
+    dpi=200,
+    bbox_inches="tight"
+)</p>
+<p>plt.show()</p>
+<p>print("Figure saved:", feature_importance_path)</p>
+<h2>7. Recommendation</h2>
+<p>The model output should be used as a <strong>ranked review queue</strong>, not as an automated content-decision system.</p>
+<h3>Ranked actions</h3>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Situation</th>
+<th>Recommended action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>High model risk + high visibility</td>
+<td>Investigate first and preserve valuable existing content before changes.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>High model risk + weaker position</td>
+<td>Review search intent, relevance, and on-page coverage.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>High model risk + low prior visibility</td>
+<td>Investigate search opportunity and business value before considering a refresh.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Established content with elevated model risk</td>
+<td>Review recent performance and relevance before deciding on intervention.</td>
+</tr>
+</tbody>
+</table>
+<h3>Human review workflow</h3>
+<p>A FlyRank editor could use the queue as follows:</p>
+<ol>
+<li>Start with the highest-ranked observations.</li>
+<li>Review the model score and reason codes.</li>
+<li>Check search intent, content relevance, historical context, and business value.</li>
+<li>Decide whether to refresh, investigate further, monitor, or take no action.</li>
+<li>Measure subsequent performance separately if an intervention is made.</li>
+</ol>
+<h3>Confidence and limits</h3>
+<p>The recommendations are <strong>directional decision-support signals</strong> based on measured historical patterns. They should not be interpreted as proof that a page needs a refresh or that a refresh will improve performance.</p>
+<h3>No-go cases</h3>
+<p>The model should <strong>not</strong> independently:</p>
+<ul>
+<li>Rewrite or publish content.</li>
+<li>Delete or redirect pages.</li>
+<li>Change technical SEO settings.</li>
+<li>Declare a page successful or unsuccessful.</li>
+<li>Make client-facing recommendations without human review.</li>
+<li>Treat a model score as a guaranteed future outcome.</li>
+</ul>
+<p>The practical value of the system is therefore in <strong>prioritizing human attention</strong>, while the final content decision remains with a qualified reviewer.</p>
+<h2>8. Reproducibility</h2>
+<p>The analysis is organized as a sequence of research notebooks covering the progression from research question through validation and action recommendations.</p>
+<h3>Research workflow</h3>
+<ul>
+<li><a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/work/notebooks/w01_research_question.ipynb">Week 1 — Research question</a></li>
+<li><a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/work/notebooks/w02_ml_task_framing.ipynb">Week 2 — ML task framing</a></li>
+<li><a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/work/notebooks/w03_data_contract.ipynb">Week 3 — Data contract</a></li>
+<li><a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/work/notebooks/w03_feature_leakage_check.ipynb">Week 3 — Feature leakage check</a></li>
+<li><a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/work/notebooks/w04_baseline_score.ipynb">Week 4 — Baseline score</a></li>
+<li><a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/work/notebooks/w04_signal_audit.ipynb">Week 4 — Signal audit</a></li>
+<li><a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/work/notebooks/w05_model.ipynb">Week 5 — Model</a></li>
+<li><a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/work/notebooks/w06_validation_audit.ipynb">Week 6 — Validation audit</a></li>
+<li><a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/work/notebooks/w07_action_playbook.ipynb">Week 7 — Action playbook</a></li>
+<li><a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/work/notebooks/capstone.ipynb">Capstone analysis</a></li>
+</ul>
+<h3>Environment</h3>
+<p>The project environment is specified in <a href="https://github.com/atulpatel-net/FlyRank_ML_In/blob/main/requirements.txt"><code>requirements.txt</code></a>. The analysis uses Python, DuckDB, pandas, NumPy, and scikit-learn.</p>
+<p>The primary model evaluation uses <code>random_state = 42</code> and a 75/25 client-grouped split.</p>
+<h3>Data access</h3>
+<p>The analysis references the FlyRank ML Internship dataset rather than committing the underlying bulk data to the repository.</p>
+<p>The capstone notebook contains the feature construction, target definition, validation split, model training, baseline comparison, and artifact-generation steps needed to reproduce the reported results.</p>
+<h3>Repository</h3>
+<p>The complete research workflow and supporting artifacts are available in the <a href="https://github.com/atulpatel-net/FlyRank_ML_In">FlyRank_ML_In GitHub repository</a>.</p>
+<hr>
+<h2>Paper Figures</h2>
+
+<h3>Model vs Rule-Based Baseline ? F1</h3>
+<img src="assets/capstone_model_vs_baseline_f1.png"
+     alt="Model versus rule-based baseline F1 comparison">
+
+<h3>Week-7 Decline Score Distribution</h3>
+<img src="assets/w07_decline_score_distribution.png"
+     alt="Distribution of decline scores from the Week-7 action playbook">
+
+</body>
+</html>
